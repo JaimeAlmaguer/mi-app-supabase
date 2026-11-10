@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Sistema de recursos humanos orientado a objetos" />
+    <title>RH Core | Panel de control</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script>
+      // Reemplaza el placeholder por la clave anon pública de tu proyecto Supabase.
+      window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3Y2l3YWVrZ21uY2d3bm9jeWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzNDQwODQsImV4cCI6MjEwNDkyMDA4NH0.GCAkNBJMrXemJz5excsdkRsQbSSUbjWNHC4azOBNKKM';
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegación principal">
+        <a class="brand" href="./index.html">
+          <span class="brand-mark">RH</span>
+          <span>RH Core</span>
+        </a>
+        <p class="sidebar-caption">Gestión de talento</p>
+        <nav class="navigation" id="module-navigation"></nav>
+        <div class="sidebar-footer">
+          <span class="connection-dot" id="connection-dot"></span>
+          <span id="connection-label">Sin conexión</span>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Sistema de recursos humanos</p>
+            <h1 id="page-title">Resumen de personal</h1>
+            <p class="subtitle">Consulta la información operativa de tu organización.</p>
+          </div>
+          <button class="button button-primary" id="refresh-button" type="button">
+            <span aria-hidden="true">↻</span> Actualizar
+          </button>
+        </header>
+
+        <section class="status-card" id="status-card" aria-live="polite">
+          <span class="status-indicator"></span>
+          <span id="status-message">Configura Supabase para comenzar.</span>
+        </section>
+
+        <section class="metric-grid" id="metric-grid" aria-label="Resumen"></section>
+
+        <section class="content-card" aria-labelledby="results-title">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Módulo seleccionado</p>
+              <h2 id="results-title">Empleados</h2>
+              <p class="muted" id="result-count">0 registros</p>
+            </div>
+            <label class="search-field">
+              <span aria-hidden="true">⌕</span>
+              <span class="sr-only">Buscar en resultados</span>
+              <input id="search-input" type="search" placeholder="Buscar…" autocomplete="off" />
+            </label>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead><tr id="table-head"></tr></thead>
+              <tbody id="results-list">
+                <tr><td class="table-message" colspan="1">Selecciona un módulo.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="info-card" aria-labelledby="info-title">
+          <div class="info-icon" aria-hidden="true">i</div>
+          <div>
+            <h2 id="info-title">Arquitectura POO</h2>
+            <p>Las entidades, el repositorio y el servicio de RH están separados de la interfaz. Consulta
+              <code>schema.sql</code> para crear las tablas en Supabase.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
