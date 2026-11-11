@@ -1,5 +1,35 @@
 const SUPABASE_URL = 'https://vwciwaekgmncgwnocygm.supabase.co'
 
+class AuthService {
+  constructor(cliente) {
+    this.cliente = cliente
+  }
+
+  async iniciarSesion(email, password) {
+    const { data, error } = await this.cliente.auth.signInWithPassword({ email, password })
+    if (error) throw new Error(error.message)
+    return data.user
+  }
+
+  async obtenerPerfil(usuarioId) {
+    const { data, error } = await this.cliente
+      .from('perfiles')
+      .select('id, rol, empleado_id, nombre')
+      .eq('id', usuarioId)
+      .single()
+    if (error) throw new Error(`No se pudo cargar el perfil: ${error.message}`)
+    if (!['empleado', 'administrador'].includes(data.rol)) {
+      throw new Error('El perfil no tiene un rol válido.')
+    }
+    return data
+  }
+
+  async cerrarSesion() {
+    const { error } = await this.cliente.auth.signOut()
+    if (error) throw new Error(error.message)
+  }
+}
+
 class Entidad {
   constructor(datos = {}) {
     Object.assign(this, datos)
@@ -70,8 +100,17 @@ const MODULOS = [
   { id: 'puestos', label: 'Puestos', icon: '◆' },
 ]
 
-const estado = { modulo: 'empleados', registros: [], resumen: {} }
+const estado = { modulo: 'empleados', registros: [], resumen: {}, perfil: null }
 const elementos = {
+  loginScreen: document.querySelector('#login-screen'),
+  appShell: document.querySelector('#app-shell'),
+  loginForm: document.querySelector('#login-form'),
+  loginEmail: document.querySelector('#login-email'),
+  loginPassword: document.querySelector('#login-password'),
+  loginButton: document.querySelector('#login-button'),
+  loginMessage: document.querySelector('#login-message'),
+  logout: document.querySelector('#logout-button'),
+  userBadge: document.querySelector('#user-badge'),
   navigation: document.querySelector('#module-navigation'),
   metrics: document.querySelector('#metric-grid'),
   title: document.querySelector('#results-title'),
@@ -84,6 +123,28 @@ const elementos = {
   refresh: document.querySelector('#refresh-button'),
   connectionDot: document.querySelector('#connection-dot'),
   connectionLabel: document.querySelector('#connection-label'),
+}
+
+function configurarCliente() {
+  const clave = globalThis.SUPABASE_ANON_KEY
+  if (!clave || clave === '******' || !globalThis.supabase) {
+    throw new Error('Configura una clave anon válida para usar el inicio de sesión.')
+  }
+  return globalThis.supabase.createClient(SUPABASE_URL, clave)
+}
+
+function mostrarAplicacion(perfil) {
+  estado.perfil = perfil
+  elementos.loginScreen.classList.add('is-hidden')
+  elementos.appShell.classList.remove('is-hidden')
+  elementos.userBadge.textContent = `${perfil.nombre || 'Usuario'} · ${perfil.rol === 'administrador' ? 'Administrador' : 'Empleado'}`
+}
+
+function mostrarLogin(mensaje = '') {
+  estado.perfil = null
+  elementos.appShell.classList.add('is-hidden')
+  elementos.loginScreen.classList.remove('is-hidden')
+  elementos.loginMessage.textContent = mensaje
 }
 
 function escaparHtml(valor) {
@@ -151,16 +212,8 @@ function renderizarNavegacion() {
 async function cargarDatos() {
   elementos.refresh.disabled = true
   establecerEstado('Consultando módulos en Supabase…')
-  const clave = globalThis.SUPABASE_ANON_KEY
-  if (!clave || clave === '******' || !globalThis.supabase) {
-    establecerEstado('Configura una clave anon válida para consultar Supabase.', 'error')
-    elementos.connectionLabel.textContent = 'Sin configurar'
-    elementos.connectionDot.classList.add('offline')
-    elementos.refresh.disabled = false
-    return
-  }
   try {
-    const cliente = globalThis.supabase.createClient(SUPABASE_URL, clave)
+    const cliente = configurarCliente()
     const servicio = new RecursosHumanosService(cliente)
     const resultado = await servicio.resumen()
     estado.resumen = resultado.datos
@@ -183,7 +236,57 @@ async function cargarDatos() {
   }
 }
 
+async function iniciarSesion(evento) {
+  evento.preventDefault()
+  elementos.loginButton.disabled = true
+  elementos.loginMessage.textContent = ''
+  try {
+    const cliente = configurarCliente()
+    const auth = new AuthService(cliente)
+    const usuario = await auth.iniciarSesion(
+      elementos.loginEmail.value.trim(),
+      elementos.loginPassword.value,
+    )
+    const perfil = await auth.obtenerPerfil(usuario.id)
+    mostrarAplicacion(perfil)
+    await cargarDatos()
+  } catch (error) {
+    elementos.loginMessage.textContent = error.message.includes('Invalid login credentials')
+      ? 'Correo o contraseña incorrectos.'
+      : error.message
+  } finally {
+    elementos.loginButton.disabled = false
+  }
+}
+
+async function cerrarSesion() {
+  try {
+    const cliente = configurarCliente()
+    await new AuthService(cliente).cerrarSesion()
+    mostrarLogin()
+  } catch (error) {
+    establecerEstado(`No se pudo cerrar la sesión: ${error.message}`, 'error')
+  }
+}
+
+async function restaurarSesion() {
+  try {
+    const cliente = configurarCliente()
+    const { data, error } = await cliente.auth.getSession()
+    if (error) throw new Error(error.message)
+    if (!data.session) return
+    const perfil = await new AuthService(cliente).obtenerPerfil(data.session.user.id)
+    mostrarAplicacion(perfil)
+    await cargarDatos()
+  } catch (error) {
+    mostrarLogin(error.message)
+  }
+}
+
 renderizarNavegacion()
 elementos.search.addEventListener('input', renderizarTabla)
 elementos.refresh.addEventListener('click', cargarDatos)
-cargarDatos()
+elementos.loginForm.addEventListener('submit', iniciarSesion)
+elementos.logout.addEventListener('click', cerrarSesion)
+mostrarLogin()
+restaurarSesion()

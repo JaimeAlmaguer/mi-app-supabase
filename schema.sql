@@ -60,3 +60,73 @@ create table if not exists asistencias (
     check (estado in ('presente', 'retardo', 'falta', 'permiso')),
   unique (empleado_id, fecha)
 );
+
+-- Autenticación y autorización.
+-- Primero crea las cuentas en Supabase Auth > Users y después relaciona
+-- cada UUID con un empleado en esta tabla.
+create table if not exists perfiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  nombre text not null,
+  rol text not null check (rol in ('empleado', 'administrador')),
+  empleado_id bigint unique references empleados(id) on delete set null
+);
+
+alter table perfiles enable row level security;
+alter table departamentos enable row level security;
+alter table puestos enable row level security;
+alter table empleados enable row level security;
+alter table nomina enable row level security;
+alter table vacaciones enable row level security;
+alter table asistencias enable row level security;
+
+create or replace function public.es_administrador()
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.perfiles
+    where id = auth.uid() and rol = 'administrador'
+  );
+$$;
+
+create or replace function public.empleado_actual()
+returns bigint
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select empleado_id from public.perfiles where id = auth.uid();
+$$;
+
+drop policy if exists "Usuarios consultan su perfil" on perfiles;
+drop policy if exists "Usuarios autenticados consultan departamentos" on departamentos;
+drop policy if exists "Usuarios autenticados consultan puestos" on puestos;
+drop policy if exists "Administradores ven todos los empleados" on empleados;
+drop policy if exists "Administradores ven toda la nomina" on nomina;
+drop policy if exists "Administradores ven todas las vacaciones" on vacaciones;
+drop policy if exists "Administradores ven todas las asistencias" on asistencias;
+
+create policy "Usuarios consultan su perfil" on perfiles
+  for select to authenticated using (id = auth.uid());
+
+create policy "Usuarios autenticados consultan departamentos" on departamentos
+  for select to authenticated using (true);
+
+create policy "Usuarios autenticados consultan puestos" on puestos
+  for select to authenticated using (true);
+
+create policy "Administradores ven todos los empleados" on empleados
+  for select to authenticated using (public.es_administrador() or id = public.empleado_actual());
+
+create policy "Administradores ven toda la nomina" on nomina
+  for select to authenticated using (public.es_administrador() or empleado_id = public.empleado_actual());
+
+create policy "Administradores ven todas las vacaciones" on vacaciones
+  for select to authenticated using (public.es_administrador() or empleado_id = public.empleado_actual());
+
+create policy "Administradores ven todas las asistencias" on asistencias
+  for select to authenticated using (public.es_administrador() or empleado_id = public.empleado_actual());
